@@ -1,18 +1,17 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var items: [Item] = []
-    @State private var isLoading = false
+    @State private var selectedTab = 0
     @State private var apiStatus = "Checking..."
-    @State private var errorMessage: String?
+    @State private var selectedPrinterId: Int?
 
-    private let baseURL = "http://localhost:8000"
+    private let apiClient = PrinterAPIClient()
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("your-3d-print-decision-buddy")
+                Text("3D Printer Decision Buddy")
                     .font(.title.bold())
                 Spacer()
                 Circle()
@@ -26,57 +25,46 @@ struct ContentView: View {
 
             Divider()
 
-            // Content
-            if let error = errorMessage {
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.largeTitle)
-                        .foregroundStyle(.orange)
-                    Text(error)
-                        .foregroundStyle(.secondary)
-                    Text("Start API: cd services/api && uv run fastapi dev")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if isLoading {
-                ProgressView("Loading items...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ItemsTable(items: items)
+            // Tab View
+            TabView(selection: $selectedTab) {
+                PrinterBrowseView()
+                    .tabItem {
+                        Label("Browse", systemImage: "list.bullet.rectangle")
+                    }
+                    .tag(0)
+
+                PrinterQuizView()
+                    .tabItem {
+                        Label("Find My Printer", systemImage: "sparkles")
+                    }
+                    .tag(1)
+
+                MaterialsBrowseView()
+                    .tabItem {
+                        Label("Materials", systemImage: "cylinder")
+                    }
+                    .tag(2)
             }
         }
         .task {
-            await loadData()
+            await checkHealth()
+        }
+        .sheet(item: $selectedPrinterId) { printerId in
+            PrinterDetailView(printerId: printerId)
         }
     }
 
-    private func loadData() async {
-        isLoading = true
-        errorMessage = nil
-
-        // Check health
+    private func checkHealth() async {
         do {
-            let url = URL(string: "\(baseURL)/health")!
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let health = try JSONDecoder().decode(HealthResponse.self, from: data)
-            apiStatus = health.status
+            apiStatus = try await apiClient.checkHealth()
         } catch {
             apiStatus = "offline"
-            errorMessage = "API not running"
-            isLoading = false
-            return
         }
-
-        // Fetch items
-        do {
-            let url = URL(string: "\(baseURL)/items")!
-            let (data, _) = try await URLSession.shared.data(from: url)
-            items = try JSONDecoder().decode([Item].self, from: data)
-        } catch {
-            errorMessage = "Failed to load items"
-        }
-
-        isLoading = false
     }
 }
+
+// MARK: - Int extension for Identifiable (for sheet)
+extension Int: @retroactive Identifiable {
+    public var id: Int { self }
+}
+
