@@ -11,7 +11,7 @@ struct Your3dPrintDecisionBuddyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppContainerView()
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1100, height: 700)
