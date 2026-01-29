@@ -19,7 +19,7 @@ struct ContentView: View {
             TabView(selection: $selectedTab) {
                 PrinterBrowseView()
                     .tabItem {
-                        Label("Browse", systemImage: "square.grid.2x2")
+                        Label("Printer Browse", systemImage: "square.grid.2x2")
                     }
                     .tag(0)
 
