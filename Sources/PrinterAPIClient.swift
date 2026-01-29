@@ -17,6 +17,7 @@ actor PrinterAPIClient {
         var printerType: String?
         var motionSystem: String?
         var hasEnclosure: Bool?
+        var hasMultiColor: Bool?
 
         init(
             priceMin: Double? = nil,
@@ -25,7 +26,8 @@ actor PrinterAPIClient {
             useCase: String? = nil,
             printerType: String? = nil,
             motionSystem: String? = nil,
-            hasEnclosure: Bool? = nil
+            hasEnclosure: Bool? = nil,
+            hasMultiColor: Bool? = nil
         ) {
             self.priceMin = priceMin
             self.priceMax = priceMax
@@ -34,6 +36,7 @@ actor PrinterAPIClient {
             self.printerType = printerType
             self.motionSystem = motionSystem
             self.hasEnclosure = hasEnclosure
+            self.hasMultiColor = hasMultiColor
         }
     }
 
@@ -61,6 +64,9 @@ actor PrinterAPIClient {
         }
         if let hasEnclosure = filters.hasEnclosure {
             queryItems.append(URLQueryItem(name: "has_enclosure", value: String(hasEnclosure)))
+        }
+        if let hasMultiColor = filters.hasMultiColor {
+            queryItems.append(URLQueryItem(name: "has_multi_color", value: String(hasMultiColor)))
         }
 
         if !queryItems.isEmpty {
@@ -128,5 +134,37 @@ actor PrinterAPIClient {
         let url = URL(string: "\(baseURL)/materials/\(id)")!
         let (data, _) = try await URLSession.shared.data(from: url)
         return try JSONDecoder().decode(Material.self, from: data)
+    }
+
+    // MARK: - Fetch Troubleshooting Issues
+
+    func fetchTroubleshooting(filters: TroubleshootingFilters = TroubleshootingFilters()) async throws -> [PrintIssueListItem] {
+        var components = URLComponents(string: "\(baseURL)/troubleshooting")!
+        var queryItems: [URLQueryItem] = []
+
+        if let printerType = filters.printerType {
+            queryItems.append(URLQueryItem(name: "printer_type", value: printerType.rawValue))
+        }
+        if let difficultyLevel = filters.difficultyLevel {
+            queryItems.append(URLQueryItem(name: "difficulty_level", value: difficultyLevel.rawValue))
+        }
+        if filters.hasSearch {
+            queryItems.append(URLQueryItem(name: "search", value: filters.search))
+        }
+
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
+
+        let (data, _) = try await URLSession.shared.data(from: components.url!)
+        return try JSONDecoder().decode([PrintIssueListItem].self, from: data)
+    }
+
+    // MARK: - Fetch Single Troubleshooting Issue
+
+    func fetchTroubleshootingIssue(id: Int) async throws -> PrintIssue {
+        let url = URL(string: "\(baseURL)/troubleshooting/\(id)")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        return try JSONDecoder().decode(PrintIssue.self, from: data)
     }
 }

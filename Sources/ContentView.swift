@@ -29,7 +29,7 @@ struct ContentView: View {
             TabView(selection: $selectedTab) {
                 PrinterBrowseView()
                     .tabItem {
-                        Label("Browse", systemImage: "list.bullet.rectangle")
+                        Label("Printer Browse", systemImage: "list.bullet.rectangle")
                     }
                     .tag(0)
 
@@ -44,6 +44,12 @@ struct ContentView: View {
                         Label("Materials", systemImage: "cylinder")
                     }
                     .tag(2)
+
+                TroubleshootingBrowseView()
+                    .tabItem {
+                        Label("Troubleshooting", systemImage: "wrench.and.screwdriver")
+                    }
+                    .tag(3)
             }
         }
         .task {
