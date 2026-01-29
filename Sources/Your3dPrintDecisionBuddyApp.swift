@@ -14,6 +14,6 @@ struct Your3dPrintDecisionBuddyApp: App {
             ContentView()
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 800, height: 600)
+        .defaultSize(width: 1100, height: 700)
     }
 }

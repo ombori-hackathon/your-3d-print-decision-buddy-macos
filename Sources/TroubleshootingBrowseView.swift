@@ -15,65 +15,21 @@ struct TroubleshootingBrowseView: View {
 
     var body: some View {
         HSplitView {
-            // Filter Sidebar
+            // Apple-style Filter Sidebar
             filterSidebar
-                .frame(minWidth: 200, maxWidth: 250)
+                .frame(minWidth: 220, maxWidth: 260)
 
             // Main Content
             VStack(spacing: 0) {
                 // Search bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("Search problems...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .onSubmit {
-                            Task {
-                                await loadIssues()
-                            }
-                        }
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                            Task {
-                                await loadIssues()
-                            }
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(10)
-                .background(.secondary.opacity(0.1))
-                .cornerRadius(8)
-                .padding()
+                searchBar
+                    .padding(AppleSpacing.lg)
 
-                Divider()
+                AppleDivider()
 
-                if let error = errorMessage {
-                    errorView(error)
-                } else if isLoading {
-                    ProgressView("Loading troubleshooting guides...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if issues.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "wrench.and.screwdriver")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text("No issues found")
-                            .foregroundStyle(.secondary)
-                        Text("Try adjusting your filters or search")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    issueGrid
-                }
+                mainContent
             }
-            .frame(minWidth: 400)
+            .frame(minWidth: 500)
         }
         .task {
             await loadIssues()
@@ -84,42 +40,65 @@ struct TroubleshootingBrowseView: View {
         }
     }
 
+    // MARK: - Search Bar
+
+    private var searchBar: some View {
+        HStack(spacing: AppleSpacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            TextField("Search issues...", text: $searchText)
+                .font(AppleTypography.body)
+                .textFieldStyle(.plain)
+                .onSubmit {
+                    Task { await loadIssues() }
+                }
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    Task { await loadIssues() }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, AppleSpacing.md)
+        .padding(.vertical, AppleSpacing.sm + 2)
+        .background(Color.primary.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: AppleRadius.md))
+    }
+
     // MARK: - Filter Sidebar
 
     private var filterSidebar: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: AppleSpacing.xl) {
                 Text("Filters")
-                    .font(.headline)
+                    .font(AppleTypography.title3)
+                    .padding(.bottom, AppleSpacing.xs)
 
                 // Printer Type
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Printer Type")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
+                AppleSidebarSection("Printer Type") {
                     Picker("Type", selection: $selectedType) {
                         Text("All Types").tag(nil as MaterialType?)
                         ForEach(MaterialType.allCases) { type in
-                            HStack {
-                                Image(systemName: type.icon)
-                                Text(type.displayName)
-                            }
-                            .tag(type as MaterialType?)
+                            Label(type.displayName, systemImage: type.icon)
+                                .tag(type as MaterialType?)
                         }
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
                 }
 
-                Divider()
+                AppleDivider()
 
                 // Difficulty Level
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Difficulty Level")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
+                AppleSidebarSection("Difficulty") {
                     Picker("Difficulty", selection: $selectedDifficulty) {
                         Text("All Levels").tag(nil as DifficultyLevel?)
                         ForEach(DifficultyLevel.allCases) { level in
@@ -130,61 +109,66 @@ struct TroubleshootingBrowseView: View {
                     .pickerStyle(.menu)
                 }
 
-                Spacer()
+                Spacer(minLength: AppleSpacing.xl)
 
-                // Apply Button
-                Button("Apply Filters") {
-                    Task {
-                        await loadIssues()
+                // Action Buttons
+                VStack(spacing: AppleSpacing.sm) {
+                    ApplePrimaryButton(title: "Apply Filters", icon: "line.3.horizontal.decrease") {
+                        Task { await loadIssues() }
                     }
-                }
-                .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
 
-                Button("Reset Filters") {
-                    resetFilters()
-                    Task {
-                        await loadIssues()
+                    AppleSecondaryButton(title: "Reset", icon: "arrow.counterclockwise") {
+                        resetFilters()
+                        Task { await loadIssues() }
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
             }
-            .padding()
+            .padding(AppleSpacing.lg)
         }
-        .background(.bar)
+        .appleSidebar()
+    }
+
+    // MARK: - Main Content
+
+    private var mainContent: some View {
+        Group {
+            if let error = errorMessage {
+                AppleErrorState(message: error) {
+                    Task { await loadIssues() }
+                }
+            } else if isLoading {
+                AppleLoadingState(message: "Loading troubleshooting guides...")
+            } else if issues.isEmpty {
+                AppleEmptyState(
+                    icon: "wrench.and.screwdriver",
+                    title: "No issues found",
+                    subtitle: "Try adjusting your filters or search"
+                )
+            } else {
+                issueGrid
+            }
+        }
     }
 
     // MARK: - Issue Grid
 
     private var issueGrid: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280, maximum: 350))], spacing: 16) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 260, maximum: 320))],
+                spacing: AppleSpacing.lg
+            ) {
                 ForEach(issues) { issue in
-                    TroubleshootingCard(issue: issue)
+                    AppleTroubleshootingCard(issue: issue)
                         .onTapGesture {
                             detailIssueId = issue.id
                         }
                 }
             }
-            .padding()
+            .padding(AppleSpacing.xl)
         }
-    }
-
-    // MARK: - Error View
-
-    private func errorView(_ error: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-                .foregroundStyle(.orange)
-            Text(error)
-                .foregroundStyle(.secondary)
-            Button("Retry") {
-                Task {
-                    await loadIssues()
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Actions
@@ -215,24 +199,24 @@ struct TroubleshootingBrowseView: View {
     }
 }
 
-// MARK: - Troubleshooting Card
+// MARK: - Apple Troubleshooting Card
 
-struct TroubleshootingCard: View {
+struct AppleTroubleshootingCard: View {
     let issue: PrintIssueListItem
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header with image
             ZStack {
-                Rectangle()
-                    .fill(cardGradient)
+                cardGradient
+                    .frame(height: 100)
 
                 if let imageUrl = issue.imageUrl, let url = URL(string: imageUrl) {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
                             ProgressView()
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .scaleEffect(0.6)
                         case .success(let image):
                             image
                                 .resizable()
@@ -243,94 +227,81 @@ struct TroubleshootingCard: View {
                             fallbackIcon
                         }
                     }
-                    .frame(height: 110)
+                    .frame(height: 100)
                     .clipped()
                 } else {
                     fallbackIcon
                 }
 
-                // Overlay with name
+                // Title overlay
                 VStack {
                     Spacer()
                     Text(issue.name)
-                        .font(.headline.bold())
+                        .font(AppleTypography.headline)
                         .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.5), radius: 2)
+                        .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 8)
+                        .padding(.horizontal, AppleSpacing.sm)
+                        .padding(.bottom, AppleSpacing.sm)
                 }
             }
-            .frame(height: 110)
-            .frame(maxWidth: .infinity)
+            .frame(height: 100)
 
-            // Info
-            VStack(alignment: .leading, spacing: 8) {
+            // Content
+            VStack(alignment: .leading, spacing: AppleSpacing.sm) {
                 // Description
                 Text(issue.description)
-                    .font(.caption)
+                    .font(AppleTypography.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
 
                 // Badges
-                HStack(spacing: 6) {
-                    // Type badge
-                    Text(issue.printerType.uppercased())
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(issue.printerType == "fdm" ? .blue.opacity(0.2) : .purple.opacity(0.2))
-                        .cornerRadius(4)
+                HStack(spacing: AppleSpacing.sm) {
+                    ApplePill(
+                        text: issue.printerType.uppercased(),
+                        color: issue.printerType == "fdm" ? .appleBlue : .applePurple
+                    )
 
-                    // Difficulty badge
-                    Text(issue.difficultyLevel.capitalized)
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(difficultyColor.opacity(0.2))
-                        .foregroundStyle(difficultyColor)
-                        .cornerRadius(4)
+                    ApplePill(
+                        text: issue.difficultyLevel.capitalized,
+                        color: difficultyColor
+                    )
 
                     Spacer()
 
-                    // Category
                     if let category = issue.category {
                         Text(category.capitalized)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(AppleTypography.caption)
+                            .foregroundStyle(.tertiary)
                     }
                 }
 
                 // Symptoms preview
                 if !issue.symptoms.isEmpty {
-                    HStack(alignment: .top, spacing: 4) {
+                    HStack(alignment: .top, spacing: AppleSpacing.xs) {
                         Image(systemName: "exclamationmark.circle")
-                            .foregroundStyle(.orange)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.appleOrange)
                         Text(issue.symptomsPreview)
+                            .font(AppleTypography.caption)
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 }
             }
-            .padding(12)
+            .padding(AppleSpacing.md)
         }
-        .background(.background)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: AppleRadius.card))
+        .appleShadow(AppleShadow.card)
         .contentShape(Rectangle())
     }
 
     private var fallbackIcon: some View {
-        VStack(spacing: 8) {
-            Image(systemName: issueIcon)
-                .font(.system(size: 36))
-                .foregroundStyle(.white.opacity(0.9))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        Image(systemName: issueIcon)
+            .font(.system(size: 32, weight: .light))
+            .foregroundStyle(.white.opacity(0.9))
     }
 
     private var issueIcon: String {
@@ -352,27 +323,27 @@ struct TroubleshootingCard: View {
         switch issue.printerType {
         case "fdm":
             switch issue.category?.lowercased() {
-            case "extrusion": colors = [.orange, .red]
-            case "adhesion": colors = [.blue, .cyan]
-            case "quality": colors = [.purple, .pink]
-            case "mechanical": colors = [.gray, .blue]
-            case "structural": colors = [.green, .teal]
-            default: colors = [.blue, .indigo]
+            case "extrusion": colors = [.appleOrange, .appleRed]
+            case "adhesion": colors = [.appleBlue, .appleCyan]
+            case "quality": colors = [.applePurple, .applePink]
+            case "mechanical": colors = [.appleGray1, .appleBlue]
+            case "structural": colors = [.appleGreen, .appleTeal]
+            default: colors = [.appleBlue, .appleIndigo]
             }
         case "resin":
-            colors = [.purple, .indigo]
+            colors = [.applePurple, .appleIndigo]
         default:
-            colors = [.gray, .gray.opacity(0.7)]
+            colors = [.appleGray1, .appleGray2]
         }
         return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     private var difficultyColor: Color {
         switch issue.difficultyLevel {
-        case "beginner": return .green
-        case "intermediate": return .orange
-        case "advanced": return .red
-        default: return .gray
+        case "beginner": return .appleGreen
+        case "intermediate": return .appleOrange
+        case "advanced": return .appleRed
+        default: return .appleGray1
         }
     }
 }

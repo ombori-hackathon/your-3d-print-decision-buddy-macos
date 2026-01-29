@@ -14,27 +14,21 @@ struct PrinterDetailView: View {
             // Header with close button
             HStack {
                 Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+                AppleCloseButton { dismiss() }
             }
-            .padding()
+            .padding(AppleSpacing.lg)
 
             if isLoading {
-                ProgressView("Loading printer details...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                AppleLoadingState(message: "Loading printer details...")
             } else if let error = errorMessage {
-                errorView(error)
+                AppleErrorState(message: error) {
+                    Task { await loadPrinter() }
+                }
             } else if let printer = printer {
                 detailContent(printer)
             }
         }
-        .frame(minWidth: 600, minHeight: 500)
+        .frame(minWidth: 700, minHeight: 550)
         .task {
             await loadPrinter()
         }
@@ -44,186 +38,214 @@ struct PrinterDetailView: View {
 
     private func detailContent(_ printer: Printer) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                // Hero Section: Image + Basic Info
-                HStack(alignment: .top, spacing: 24) {
-                    // Image
-                    AsyncImage(url: URL(string: printer.imageUrl ?? "")) { phase in
-                        switch phase {
-                        case .empty:
-                            Rectangle()
-                                .fill(.secondary.opacity(0.1))
-                                .overlay { ProgressView() }
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        case .failure:
-                            Rectangle()
-                                .fill(.secondary.opacity(0.1))
-                                .overlay {
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 48))
-                                        .foregroundStyle(.secondary)
-                                }
-                        @unknown default:
-                            EmptyView()
-                        }
-                    }
-                    .frame(width: 250, height: 200)
-                    .background(.secondary.opacity(0.05))
-                    .cornerRadius(12)
+            VStack(alignment: .leading, spacing: AppleSpacing.xxl) {
+                // Hero Section
+                heroSection(printer)
 
-                    // Basic Info
-                    VStack(alignment: .leading, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(printer.name)
-                                .font(.title.bold())
-                            Text(printer.manufacturer)
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Text("$\(printer.price, specifier: "%.0f")")
-                            .font(.largeTitle.bold())
-                            .foregroundStyle(.green)
-
-                        // Badges
-                        HStack(spacing: 8) {
-                            Badge(text: printer.printerType.uppercased(), color: printer.printerType == "fdm" ? .blue : .purple)
-
-                            if let motion = printer.motionSystem {
-                                Badge(text: motion == "corexy" ? "CoreXY" : "Bed Slinger", color: motion == "corexy" ? .green : .orange)
-                            }
-
-                            if printer.enclosure {
-                                Badge(text: "Enclosed", color: .teal)
-                            }
-
-                            if printer.autoLeveling {
-                                Badge(text: "Auto Leveling", color: .indigo)
-                            }
-                        }
-
-                        if let description = printer.description {
-                            Text(description)
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-                                .padding(.top, 4)
-                        }
-                    }
-                }
-
-                Divider()
+                AppleDivider()
 
                 // Specifications
-                Text("Specifications")
-                    .font(.title2.bold())
+                specsSection(printer)
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                    SpecCard(title: "Build Volume", value: printer.buildVolumeDescription, icon: "cube")
-
-                    if let maxSpeed = printer.maxSpeed {
-                        SpecCard(title: "Max Speed", value: "\(maxSpeed) mm/s", icon: "speedometer")
-                    }
-
-                    if let resolution = printer.layerResolution {
-                        SpecCard(title: "Min Layer", value: String(format: "%.3f mm", resolution), icon: "square.stack.3d.up")
-                    }
-
-                    if let noiseLevel = printer.noiseLevel {
-                        SpecCard(title: "Noise Level", value: noiseLevel.capitalized, icon: "speaker.wave.2")
-                    }
-
-                    SpecCard(title: "Enclosure", value: printer.enclosure ? "Yes" : "No", icon: "cube.box")
-                    SpecCard(title: "Auto Leveling", value: printer.autoLeveling ? "Yes" : "No", icon: "level")
-                }
-
-                Divider()
+                AppleDivider()
 
                 // Materials
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Supported Materials")
-                        .font(.title3.bold())
+                materialsSection(printer)
 
-                    FlowLayout(spacing: 8) {
-                        ForEach(printer.materials, id: \.self) { material in
-                            Text(material)
-                                .font(.callout)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(.blue.opacity(0.1))
-                                .cornerRadius(8)
-                        }
-                    }
-                }
-
-                Divider()
+                AppleDivider()
 
                 // Connectivity
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Connectivity")
-                        .font(.title3.bold())
+                connectivitySection(printer)
 
-                    FlowLayout(spacing: 8) {
-                        ForEach(printer.connectivity, id: \.self) { conn in
-                            HStack(spacing: 6) {
-                                Image(systemName: iconFor(connectivity: conn))
-                                Text(conn)
-                            }
-                            .font(.callout)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(.secondary.opacity(0.1))
-                            .cornerRadius(8)
-                        }
-                    }
-                }
-
-                Divider()
+                AppleDivider()
 
                 // Skill Levels & Use Cases
-                HStack(alignment: .top, spacing: 48) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Skill Levels")
-                            .font(.title3.bold())
-                        ForEach(printer.skillLevels, id: \.self) { level in
-                            Label(level.capitalized, systemImage: iconFor(skillLevel: level))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Use Cases")
-                            .font(.title3.bold())
-                        ForEach(printer.useCases, id: \.self) { useCase in
-                            Label(useCase.capitalized, systemImage: iconFor(useCase: useCase))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                HStack(alignment: .top, spacing: AppleSpacing.section) {
+                    skillLevelsSection(printer)
+                    useCasesSection(printer)
                 }
-
-                Divider()
 
                 // Action Button
                 if let url = printer.productUrl, let productURL = URL(string: url) {
+                    AppleDivider()
+
                     Link(destination: productURL) {
-                        HStack {
+                        HStack(spacing: AppleSpacing.sm) {
                             Image(systemName: "safari")
+                                .font(.system(size: 14, weight: .semibold))
                             Text("View Product Page")
+                                .font(AppleTypography.headline)
                         }
-                        .font(.headline)
                         .frame(maxWidth: .infinity)
-                        .padding()
+                        .padding(AppleSpacing.md)
+                        .background(Color.appleBlue)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: AppleRadius.button))
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(24)
+            .padding(AppleSpacing.xxl)
         }
     }
 
-    // MARK: - Helper Views
+    // MARK: - Hero Section
+
+    private func heroSection(_ printer: Printer) -> some View {
+        HStack(alignment: .top, spacing: AppleSpacing.xxl) {
+            // Image
+            AppleAsyncImage(url: printer.imageUrl, fallbackIcon: "printer")
+                .frame(width: 240, height: 180)
+                .background(Color.primary.opacity(0.02))
+                .clipShape(RoundedRectangle(cornerRadius: AppleRadius.lg))
+
+            // Basic Info
+            VStack(alignment: .leading, spacing: AppleSpacing.md) {
+                VStack(alignment: .leading, spacing: AppleSpacing.xs) {
+                    Text(printer.name)
+                        .font(AppleTypography.largeTitle)
+
+                    Text(printer.manufacturer)
+                        .font(AppleTypography.title2)
+                        .foregroundStyle(.secondary)
+                }
+
+                ApplePrice(amount: printer.price, size: .large)
+
+                // Badges
+                AppleFlowLayout(spacing: AppleSpacing.sm) {
+                    ApplePill(
+                        text: printer.printerType.uppercased(),
+                        color: printer.printerType == "fdm" ? .appleBlue : .applePurple
+                    )
+
+                    if let motion = printer.motionSystem {
+                        ApplePill(
+                            text: motion == "corexy" ? "CoreXY" : "Bed Slinger",
+                            color: motion == "corexy" ? .appleGreen : .appleOrange
+                        )
+                    }
+
+                    if printer.enclosure {
+                        ApplePill(text: "Enclosed", color: .appleTeal)
+                    }
+
+                    if printer.autoLeveling {
+                        ApplePill(text: "Auto Leveling", color: .appleIndigo)
+                    }
+                }
+
+                if let description = printer.description {
+                    Text(description)
+                        .font(AppleTypography.body)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, AppleSpacing.xs)
+                }
+            }
+        }
+    }
+
+    // MARK: - Specifications Section
+
+    private func specsSection(_ printer: Printer) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.lg) {
+            AppleSectionHeader(title: "Specifications", icon: "slider.horizontal.3", iconColor: .appleBlue)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: AppleSpacing.md) {
+                AppleInfoCard(title: "Build Volume", value: printer.buildVolumeDescription, icon: "cube", tint: .appleBlue)
+
+                if let maxSpeed = printer.maxSpeed {
+                    AppleInfoCard(title: "Max Speed", value: "\(maxSpeed) mm/s", icon: "speedometer", tint: .appleGreen)
+                }
+
+                if let resolution = printer.layerResolution {
+                    AppleInfoCard(title: "Min Layer", value: String(format: "%.3f mm", resolution), icon: "square.stack.3d.up", tint: .applePurple)
+                }
+
+                if let noiseLevel = printer.noiseLevel {
+                    AppleInfoCard(title: "Noise Level", value: noiseLevel.capitalized, icon: "speaker.wave.2", tint: .appleOrange)
+                }
+
+                AppleInfoCard(title: "Enclosure", value: printer.enclosure ? "Yes" : "No", icon: "cube.box", tint: .appleTeal)
+
+                AppleInfoCard(title: "Auto Leveling", value: printer.autoLeveling ? "Yes" : "No", icon: "level", tint: .appleIndigo)
+            }
+        }
+    }
+
+    // MARK: - Materials Section
+
+    private func materialsSection(_ printer: Printer) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.lg) {
+            AppleSectionHeader(title: "Supported Materials", icon: "cylinder.split.1x2", iconColor: .appleBlue)
+
+            AppleFlowLayout(spacing: AppleSpacing.sm) {
+                ForEach(printer.materials, id: \.self) { material in
+                    AppleTag(text: material, color: .appleBlue)
+                }
+            }
+        }
+    }
+
+    // MARK: - Connectivity Section
+
+    private func connectivitySection(_ printer: Printer) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.lg) {
+            AppleSectionHeader(title: "Connectivity", icon: "antenna.radiowaves.left.and.right", iconColor: .appleGreen)
+
+            AppleFlowLayout(spacing: AppleSpacing.sm) {
+                ForEach(printer.connectivity, id: \.self) { conn in
+                    AppleTag(text: conn, icon: iconFor(connectivity: conn), color: .appleGreen)
+                }
+            }
+        }
+    }
+
+    // MARK: - Skill Levels Section
+
+    private func skillLevelsSection(_ printer: Printer) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.md) {
+            AppleSectionHeader(title: "Skill Levels", icon: "star.fill", iconColor: .appleYellow)
+
+            VStack(alignment: .leading, spacing: AppleSpacing.sm) {
+                ForEach(printer.skillLevels, id: \.self) { level in
+                    HStack(spacing: AppleSpacing.sm) {
+                        Image(systemName: iconFor(skillLevel: level))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        Text(level.capitalized)
+                            .font(AppleTypography.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Use Cases Section
+
+    private func useCasesSection(_ printer: Printer) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.md) {
+            AppleSectionHeader(title: "Use Cases", icon: "briefcase.fill", iconColor: .applePurple)
+
+            VStack(alignment: .leading, spacing: AppleSpacing.sm) {
+                ForEach(printer.useCases, id: \.self) { useCase in
+                    HStack(spacing: AppleSpacing.sm) {
+                        Image(systemName: iconFor(useCase: useCase))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        Text(useCase.capitalized)
+                            .font(AppleTypography.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Helper Methods
 
     private func iconFor(connectivity: String) -> String {
         switch connectivity.lowercased() {
@@ -254,22 +276,6 @@ struct PrinterDetailView: View {
         }
     }
 
-    private func errorView(_ error: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-                .foregroundStyle(.orange)
-            Text(error)
-                .foregroundStyle(.secondary)
-            Button("Retry") {
-                Task {
-                    await loadPrinter()
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
     // MARK: - Actions
 
     private func loadPrinter() async {
@@ -286,25 +292,16 @@ struct PrinterDetailView: View {
     }
 }
 
-// MARK: - Badge
+// MARK: - Legacy Components (keeping for backward compatibility)
 
 struct Badge: View {
     let text: String
     let color: Color
 
     var body: some View {
-        Text(text)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.2))
-            .foregroundStyle(color)
-            .cornerRadius(6)
+        ApplePill(text: text, color: color)
     }
 }
-
-// MARK: - Spec Card
 
 struct SpecCard: View {
     let title: String
@@ -312,28 +309,12 @@ struct SpecCard: View {
     let icon: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundStyle(.blue)
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Text(value)
-                .font(.headline)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.secondary.opacity(0.05))
-        .cornerRadius(10)
+        AppleInfoCard(title: title, value: value, icon: icon, tint: .appleBlue)
     }
 }
 
-// MARK: - Flow Layout
-
 struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
+    var spacing: CGFloat = AppleSpacing.sm
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let result = FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)

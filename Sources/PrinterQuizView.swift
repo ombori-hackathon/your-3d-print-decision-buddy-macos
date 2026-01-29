@@ -10,11 +10,11 @@ struct PrinterQuizView: View {
 
         var title: String {
             switch self {
-            case .skillLevel: return "Experience Level"
-            case .useCase: return "Primary Use"
+            case .skillLevel: return "Experience"
+            case .useCase: return "Purpose"
             case .budget: return "Budget"
-            case .preferences: return "Preferences"
-            case .results: return "Your Matches"
+            case .preferences: return "Features"
+            case .results: return "Results"
             }
         }
     }
@@ -29,52 +29,92 @@ struct PrinterQuizView: View {
     @State private var recommendations: [RecommendationResult] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var detailPrinterId: Int?
 
     private let apiClient = PrinterAPIClient()
 
     var body: some View {
         VStack(spacing: 0) {
-            // Progress Indicator
-            progressIndicator
-                .padding()
-                .background(.bar)
+            // Apple-style Progress Indicator
+            progressBar
+                .padding(.horizontal, AppleSpacing.section)
+                .padding(.vertical, AppleSpacing.lg)
+                .background(.ultraThinMaterial)
 
-            Divider()
+            AppleDivider()
 
             // Content
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: AppleSpacing.xxl) {
                     stepContent
                 }
-                .padding(32)
+                .padding(AppleSpacing.section)
+                .frame(maxWidth: 600)
+                .frame(maxWidth: .infinity)
             }
 
-            Divider()
+            AppleDivider()
 
             // Navigation
-            navigationButtons
-                .padding()
-                .background(.bar)
+            navigationBar
+                .padding(AppleSpacing.lg)
+                .background(.ultraThinMaterial)
+        }
+        .sheet(item: $detailPrinterId) { printerId in
+            PrinterDetailView(printerId: printerId)
+                .frame(minWidth: 700, minHeight: 550)
         }
     }
 
-    // MARK: - Progress Indicator
+    // MARK: - Progress Bar
 
-    private var progressIndicator: some View {
-        HStack(spacing: 8) {
+    private var progressBar: some View {
+        HStack(spacing: 0) {
             ForEach(QuizStep.allCases, id: \.rawValue) { step in
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(step.rawValue <= currentStep.rawValue ? .blue : .secondary.opacity(0.3))
-                        .frame(width: 10, height: 10)
+                HStack(spacing: 0) {
+                    // Step indicator
+                    VStack(spacing: AppleSpacing.xs) {
+                        ZStack {
+                            Circle()
+                                .fill(stepColor(for: step))
+                                .frame(width: 28, height: 28)
 
+                            if step.rawValue < currentStep.rawValue {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(.white)
+                            } else {
+                                Text("\(step.rawValue + 1)")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(step.rawValue <= currentStep.rawValue ? .white : .secondary)
+                            }
+                        }
+
+                        Text(step.title)
+                            .font(AppleTypography.caption)
+                            .foregroundStyle(step.rawValue <= currentStep.rawValue ? .primary : .tertiary)
+                    }
+
+                    // Connector line
                     if step != .results {
                         Rectangle()
-                            .fill(step.rawValue < currentStep.rawValue ? .blue : .secondary.opacity(0.3))
+                            .fill(step.rawValue < currentStep.rawValue ? Color.appleBlue : Color.primary.opacity(0.1))
                             .frame(height: 2)
+                            .padding(.horizontal, AppleSpacing.sm)
+                            .padding(.bottom, AppleSpacing.lg)
                     }
                 }
             }
+        }
+    }
+
+    private func stepColor(for step: QuizStep) -> Color {
+        if step.rawValue < currentStep.rawValue {
+            return .appleGreen
+        } else if step.rawValue == currentStep.rawValue {
+            return .appleBlue
+        } else {
+            return Color.primary.opacity(0.1)
         }
     }
 
@@ -97,21 +137,23 @@ struct PrinterQuizView: View {
     }
 
     private var skillLevelStep: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: AppleSpacing.xxl) {
             stepHeader(
-                title: "What's your 3D printing experience?",
-                subtitle: "This helps us recommend printers that match your skill level."
+                title: "What's your experience level?",
+                subtitle: "We'll recommend printers that match your skills."
             )
 
-            VStack(spacing: 12) {
+            VStack(spacing: AppleSpacing.md) {
                 ForEach(SkillLevel.allCases) { level in
-                    SelectionCard(
+                    AppleSelectionCard(
                         title: level.displayName,
                         description: descriptionFor(level),
                         icon: iconFor(level),
                         isSelected: selectedSkillLevel == level
                     ) {
-                        selectedSkillLevel = level
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedSkillLevel = level
+                        }
                     }
                 }
             }
@@ -119,21 +161,23 @@ struct PrinterQuizView: View {
     }
 
     private var useCaseStep: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: AppleSpacing.xxl) {
             stepHeader(
-                title: "What will you mainly use the printer for?",
-                subtitle: "Different use cases benefit from different printer features."
+                title: "What will you create?",
+                subtitle: "Different uses benefit from different features."
             )
 
-            VStack(spacing: 12) {
+            VStack(spacing: AppleSpacing.md) {
                 ForEach(UseCase.allCases) { useCase in
-                    SelectionCard(
+                    AppleSelectionCard(
                         title: useCase.displayName,
                         description: descriptionFor(useCase),
                         icon: iconFor(useCase),
                         isSelected: selectedUseCase == useCase
                     ) {
-                        selectedUseCase = useCase
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedUseCase = useCase
+                        }
                     }
                 }
             }
@@ -141,79 +185,90 @@ struct PrinterQuizView: View {
     }
 
     private var budgetStep: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: AppleSpacing.xxl) {
             stepHeader(
                 title: "What's your budget?",
-                subtitle: "Set your comfortable price range."
+                subtitle: "Set a comfortable price range."
             )
 
-            VStack(spacing: 20) {
-                // Budget display
-                HStack {
-                    VStack {
-                        Text("Minimum")
-                            .font(.caption)
+            VStack(spacing: AppleSpacing.xl) {
+                // Budget display card
+                HStack(spacing: AppleSpacing.xxxl) {
+                    VStack(spacing: AppleSpacing.xs) {
+                        Text("From")
+                            .font(AppleTypography.caption)
                             .foregroundStyle(.secondary)
                         Text("$\(Int(budgetMin))")
-                            .font(.title2.bold())
+                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
                     }
-                    Spacer()
-                    VStack {
-                        Text("Maximum")
-                            .font(.caption)
+
+                    Rectangle()
+                        .fill(Color.appleSeparator)
+                        .frame(width: 1, height: 40)
+
+                    VStack(spacing: AppleSpacing.xs) {
+                        Text("To")
+                            .font(AppleTypography.caption)
                             .foregroundStyle(.secondary)
                         Text("$\(Int(budgetMax))")
-                            .font(.title2.bold())
+                            .font(.system(size: 28, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
                     }
                 }
-                .padding()
-                .background(.secondary.opacity(0.1))
-                .cornerRadius(12)
+                .frame(maxWidth: .infinity)
+                .padding(AppleSpacing.xl)
+                .background(Color.primary.opacity(0.03))
+                .clipShape(RoundedRectangle(cornerRadius: AppleRadius.lg))
 
                 // Sliders
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading) {
-                        Text("Minimum: $\(Int(budgetMin))")
-                            .font(.caption)
+                VStack(spacing: AppleSpacing.lg) {
+                    VStack(alignment: .leading, spacing: AppleSpacing.sm) {
+                        Text("Minimum")
+                            .font(AppleTypography.caption)
+                            .foregroundStyle(.secondary)
                         Slider(value: $budgetMin, in: 100...5000, step: 50)
+                            .tint(Color.appleBlue)
                     }
 
-                    VStack(alignment: .leading) {
-                        Text("Maximum: $\(Int(budgetMax))")
-                            .font(.caption)
+                    VStack(alignment: .leading, spacing: AppleSpacing.sm) {
+                        Text("Maximum")
+                            .font(AppleTypography.caption)
+                            .foregroundStyle(.secondary)
                         Slider(value: $budgetMax, in: 200...6000, step: 50)
+                            .tint(Color.appleBlue)
                     }
                 }
 
                 // Quick presets
-                HStack(spacing: 12) {
+                HStack(spacing: AppleSpacing.sm) {
                     budgetPresetButton("Budget", min: 100, max: 400)
                     budgetPresetButton("Mid-Range", min: 400, max: 1000)
                     budgetPresetButton("Premium", min: 1000, max: 3000)
-                    budgetPresetButton("Professional", min: 2000, max: 6000)
+                    budgetPresetButton("Pro", min: 2000, max: 6000)
                 }
             }
         }
     }
 
     private var preferencesStep: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: AppleSpacing.xxl) {
             stepHeader(
-                title: "Any specific preferences?",
-                subtitle: "These features can affect your printing experience."
+                title: "Any specific features?",
+                subtitle: "Optional preferences to refine your results."
             )
 
-            VStack(spacing: 16) {
-                PreferenceToggle(
-                    title: "Enclosed Build Chamber",
-                    description: "Better temperature control for ABS/ASA, safer around children/pets",
+            VStack(spacing: AppleSpacing.md) {
+                ApplePreferenceToggle(
+                    title: "Enclosed Chamber",
+                    description: "Better for ABS/ASA, safer around children and pets",
                     icon: "cube.box",
                     isOn: $preferEnclosure
                 )
 
-                PreferenceToggle(
-                    title: "Automatic Bed Leveling",
-                    description: "Makes setup easier, especially recommended for beginners",
+                ApplePreferenceToggle(
+                    title: "Auto Bed Leveling",
+                    description: "Easier setup, especially recommended for beginners",
                     icon: "level",
                     isOn: $preferAutoLeveling
                 )
@@ -222,76 +277,67 @@ struct PrinterQuizView: View {
     }
 
     private var resultsStep: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: AppleSpacing.xxl) {
             if isLoading {
-                ProgressView("Finding your perfect printers...")
-                    .frame(maxHeight: .infinity)
+                AppleLoadingState(message: "Finding your perfect printers...")
             } else if let error = errorMessage {
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.largeTitle)
-                        .foregroundStyle(.orange)
-                    Text(error)
-                    Button("Retry") {
-                        Task {
-                            await fetchRecommendations()
-                        }
-                    }
+                AppleErrorState(message: error) {
+                    Task { await fetchRecommendations() }
                 }
             } else if recommendations.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("No printers found matching your criteria")
-                    Text("Try adjusting your budget or preferences")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                AppleEmptyState(
+                    icon: "magnifyingglass",
+                    title: "No matches found",
+                    subtitle: "Try adjusting your budget or preferences"
+                )
             } else {
                 stepHeader(
-                    title: "Here are your top matches!",
-                    subtitle: "Based on your preferences, these printers are the best fit."
+                    title: "Your Top Matches",
+                    subtitle: "Based on your preferences"
                 )
 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 280, maximum: 350))], spacing: 16) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 260, maximum: 320))], spacing: AppleSpacing.lg) {
                     ForEach(recommendations) { result in
-                        RecommendationCard(result: result)
+                        AppleRecommendationCard(result: result)
+                            .onTapGesture {
+                                detailPrinterId = result.printer.id
+                            }
                     }
                 }
             }
         }
     }
 
-    // MARK: - Navigation Buttons
+    // MARK: - Navigation Bar
 
-    private var navigationButtons: some View {
+    private var navigationBar: some View {
         HStack {
             if currentStep != .skillLevel {
-                Button("Back") {
-                    withAnimation {
+                AppleSecondaryButton(title: "Back", icon: "chevron.left") {
+                    withAnimation(.spring(response: 0.3)) {
                         goToPreviousStep()
                     }
                 }
-                .buttonStyle(.bordered)
             }
 
             Spacer()
 
             if currentStep == .results {
-                Button("Start Over") {
-                    withAnimation {
+                ApplePrimaryButton(title: "Start Over", icon: "arrow.counterclockwise") {
+                    withAnimation(.spring(response: 0.3)) {
                         resetQuiz()
                     }
                 }
-                .buttonStyle(.borderedProminent)
             } else {
-                Button(currentStep == .preferences ? "See Results" : "Continue") {
-                    withAnimation {
+                ApplePrimaryButton(
+                    title: currentStep == .preferences ? "See Results" : "Continue",
+                    icon: currentStep == .preferences ? "sparkles" : "chevron.right"
+                ) {
+                    withAnimation(.spring(response: 0.3)) {
                         goToNextStep()
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .opacity(canProceed ? 1.0 : 0.5)
                 .disabled(!canProceed)
             }
         }
@@ -300,23 +346,43 @@ struct PrinterQuizView: View {
     // MARK: - Helper Views
 
     private func stepHeader(title: String, subtitle: String) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AppleSpacing.sm) {
             Text(title)
-                .font(.title2.bold())
+                .font(AppleTypography.title1)
+                .multilineTextAlignment(.center)
+
             Text(subtitle)
-                .font(.callout)
+                .font(AppleTypography.body)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
-        .multilineTextAlignment(.center)
     }
 
     private func budgetPresetButton(_ label: String, min: Double, max: Double) -> some View {
-        Button(label) {
-            budgetMin = min
-            budgetMax = max
+        Button {
+            withAnimation(.spring(response: 0.3)) {
+                budgetMin = min
+                budgetMax = max
+            }
+        } label: {
+            Text(label)
+                .font(AppleTypography.caption)
+                .fontWeight(.medium)
+                .padding(.horizontal, AppleSpacing.md)
+                .padding(.vertical, AppleSpacing.sm)
+                .background(
+                    budgetMin == min && budgetMax == max
+                        ? Color.appleBlue
+                        : Color.primary.opacity(0.06)
+                )
+                .foregroundStyle(
+                    budgetMin == min && budgetMax == max
+                        ? .white
+                        : .primary
+                )
+                .clipShape(Capsule())
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .buttonStyle(.plain)
     }
 
     // MARK: - Helper Functions
@@ -336,9 +402,7 @@ struct PrinterQuizView: View {
         currentStep = nextStep
 
         if currentStep == .results {
-            Task {
-                await fetchRecommendations()
-            }
+            Task { await fetchRecommendations() }
         }
     }
 
@@ -386,9 +450,9 @@ struct PrinterQuizView: View {
 
     private func descriptionFor(_ level: SkillLevel) -> String {
         switch level {
-        case .beginner: return "New to 3D printing, looking for easy setup and reliability"
-        case .intermediate: return "Some experience, comfortable with basic troubleshooting"
-        case .pro: return "Advanced user, wants full control and customization"
+        case .beginner: return "New to 3D printing, want easy setup"
+        case .intermediate: return "Some experience, comfortable troubleshooting"
+        case .pro: return "Advanced user, want full control"
         }
     }
 
@@ -402,10 +466,10 @@ struct PrinterQuizView: View {
 
     private func descriptionFor(_ useCase: UseCase) -> String {
         switch useCase {
-        case .hobby: return "Personal projects, learning, casual printing"
-        case .engineering: return "Functional prototypes, mechanical parts, precision"
-        case .art: return "Figurines, sculptures, creative projects"
-        case .production: return "Small batch manufacturing, business use"
+        case .hobby: return "Personal projects, learning, casual prints"
+        case .engineering: return "Functional prototypes, mechanical parts"
+        case .art: return "Figurines, sculptures, creative work"
+        case .production: return "Small batch manufacturing, business"
         }
     }
 
@@ -419,9 +483,9 @@ struct PrinterQuizView: View {
     }
 }
 
-// MARK: - Selection Card
+// MARK: - Apple Selection Card
 
-struct SelectionCard: View {
+struct AppleSelectionCard: View {
     let title: String
     let description: String
     let icon: String
@@ -430,63 +494,73 @@ struct SelectionCard: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
+            HStack(spacing: AppleSpacing.lg) {
+                // Icon
                 Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(isSelected ? .white : .blue)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(isSelected ? .white : Color.appleBlue)
                     .frame(width: 44, height: 44)
-                    .background(isSelected ? .blue : .blue.opacity(0.1))
-                    .cornerRadius(10)
+                    .background(isSelected ? Color.appleBlue : Color.appleBlue.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: AppleRadius.md))
 
+                // Text
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.headline)
+                        .font(AppleTypography.headline)
+
                     Text(description)
-                        .font(.caption)
+                        .font(AppleTypography.callout)
                         .foregroundStyle(.secondary)
                 }
 
                 Spacer()
 
+                // Checkmark
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.blue)
+                        .font(.system(size: 20))
+                        .foregroundStyle(Color.appleBlue)
                 }
             }
-            .padding()
-            .background(isSelected ? .blue.opacity(0.1) : .secondary.opacity(0.05))
-            .cornerRadius(12)
+            .padding(AppleSpacing.lg)
+            .background(
+                isSelected
+                    ? Color.appleBlue.opacity(0.08)
+                    : Color.primary.opacity(0.03)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: AppleRadius.lg))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? .blue : .clear, lineWidth: 2)
+                RoundedRectangle(cornerRadius: AppleRadius.lg)
+                    .stroke(isSelected ? Color.appleBlue : .clear, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)
     }
 }
 
-// MARK: - Preference Toggle
+// MARK: - Apple Preference Toggle
 
-struct PreferenceToggle: View {
+struct ApplePreferenceToggle: View {
     let title: String
     let description: String
     let icon: String
     @Binding var isOn: Bool
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: AppleSpacing.lg) {
             Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(.blue)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Color.appleBlue)
                 .frame(width: 44, height: 44)
-                .background(.blue.opacity(0.1))
-                .cornerRadius(10)
+                .background(Color.appleBlue.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: AppleRadius.md))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.headline)
+                    .font(AppleTypography.headline)
+
                 Text(description)
-                    .font(.caption)
+                    .font(AppleTypography.callout)
                     .foregroundStyle(.secondary)
             }
 
@@ -494,158 +568,104 @@ struct PreferenceToggle: View {
 
             Toggle("", isOn: $isOn)
                 .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(Color.appleBlue)
         }
-        .padding()
-        .background(.secondary.opacity(0.05))
-        .cornerRadius(12)
+        .padding(AppleSpacing.lg)
+        .background(Color.primary.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: AppleRadius.lg))
     }
 }
 
-// MARK: - Recommendation Card
+// MARK: - Apple Recommendation Card
 
-struct RecommendationCard: View {
+struct AppleRecommendationCard: View {
     let result: RecommendationResult
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Image with match score badge
+            // Image with match badge
             ZStack(alignment: .topTrailing) {
-                AsyncImage(url: URL(string: result.printer.imageUrl ?? "")) { phase in
-                    switch phase {
-                    case .empty:
-                        Rectangle()
-                            .fill(.secondary.opacity(0.1))
-                            .overlay {
-                                ProgressView()
-                            }
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    case .failure:
-                        Rectangle()
-                            .fill(.secondary.opacity(0.1))
-                            .overlay {
-                                Image(systemName: "photo")
-                                    .font(.largeTitle)
-                                    .foregroundStyle(.secondary)
-                            }
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-                .frame(height: 160)
-                .frame(maxWidth: .infinity)
-                .background(.secondary.opacity(0.05))
-                .clipped()
+                AppleAsyncImage(url: result.printer.imageUrl, fallbackIcon: "printer")
+                    .frame(height: 150)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.primary.opacity(0.02))
+                    .clipped()
 
-                // Match Score Badge
-                VStack(spacing: 0) {
-                    Text("\(result.matchScore)%")
-                        .font(.headline.bold())
-                    Text("Match")
-                        .font(.caption2)
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(scoreColor)
-                .cornerRadius(8)
-                .padding(8)
+                AppleMatchBadge(score: result.matchScore)
+                    .padding(AppleSpacing.sm)
             }
 
-            // Info
-            VStack(alignment: .leading, spacing: 8) {
-                // Name and Price
+            // Content
+            VStack(alignment: .leading, spacing: AppleSpacing.sm) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(result.printer.name)
-                            .font(.headline)
+                            .font(AppleTypography.headline)
                             .lineLimit(1)
+
                         Text(result.printer.manufacturer)
-                            .font(.caption)
+                            .font(AppleTypography.caption)
                             .foregroundStyle(.secondary)
                     }
+
                     Spacer()
-                    Text("$\(result.printer.price, specifier: "%.0f")")
-                        .font(.title3.bold())
-                        .foregroundStyle(.green)
+
+                    ApplePrice(amount: result.printer.price, size: .medium)
                 }
 
                 // Badges
-                HStack(spacing: 6) {
-                    // Type badge
-                    Text(result.printer.printerType.uppercased())
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(result.printer.printerType == "fdm" ? .blue.opacity(0.2) : .purple.opacity(0.2))
-                        .cornerRadius(4)
+                HStack(spacing: AppleSpacing.sm) {
+                    ApplePill(
+                        text: result.printer.printerType.uppercased(),
+                        color: result.printer.printerType == "fdm" ? .appleBlue : .applePurple
+                    )
 
-                    // Motion badge (FDM only)
                     if let motion = result.printer.motionSystem {
-                        Text(motion == "corexy" ? "CoreXY" : "Bed Slinger")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(motion == "corexy" ? .green.opacity(0.2) : .orange.opacity(0.2))
-                            .cornerRadius(4)
+                        ApplePill(
+                            text: motion == "corexy" ? "CoreXY" : "Bed Slinger",
+                            color: motion == "corexy" ? .appleGreen : .appleOrange
+                        )
                     }
 
                     Spacer()
 
-                    // Feature icons
-                    HStack(spacing: 4) {
+                    HStack(spacing: AppleSpacing.xs) {
                         if result.printer.enclosure {
                             Image(systemName: "cube.box.fill")
-                                .help("Enclosed")
                         }
                         if result.printer.autoLeveling {
                             Image(systemName: "level.fill")
-                                .help("Auto Leveling")
                         }
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                // Build Volume
-                HStack {
-                    Image(systemName: "cube")
-                        .foregroundStyle(.secondary)
-                    Text(result.printer.buildVolumeDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
                 }
 
                 // Reasons
                 if !result.reasons.isEmpty {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(result.reasons, id: \.self) { reason in
-                            Label(reason, systemImage: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.green)
+                    AppleDivider()
+                        .padding(.vertical, AppleSpacing.xs)
+
+                    VStack(alignment: .leading, spacing: AppleSpacing.xs) {
+                        ForEach(result.reasons.prefix(2), id: \.self) { reason in
+                            HStack(spacing: AppleSpacing.xs) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Color.appleGreen)
+                                Text(reason)
+                                    .font(AppleTypography.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
                         }
                     }
                 }
             }
-            .padding(12)
+            .padding(AppleSpacing.md)
         }
-        .background(.background)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
-    }
-
-    private var scoreColor: Color {
-        if result.matchScore >= 80 {
-            return .green
-        } else if result.matchScore >= 60 {
-            return .orange
-        } else {
-            return .secondary
-        }
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: AppleRadius.card))
+        .appleShadow(AppleShadow.card)
     }
 }

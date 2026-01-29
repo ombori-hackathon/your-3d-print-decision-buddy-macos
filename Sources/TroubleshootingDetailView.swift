@@ -14,22 +14,16 @@ struct TroubleshootingDetailView: View {
             // Header with close button
             HStack {
                 Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
+                AppleCloseButton { dismiss() }
             }
-            .padding()
+            .padding(AppleSpacing.lg)
 
             if isLoading {
-                ProgressView("Loading troubleshooting guide...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                AppleLoadingState(message: "Loading troubleshooting guide...")
             } else if let error = errorMessage {
-                errorView(error)
+                AppleErrorState(message: error) {
+                    Task { await loadIssue() }
+                }
             } else if let issue = issue {
                 detailContent(issue)
             }
@@ -44,202 +38,205 @@ struct TroubleshootingDetailView: View {
 
     private func detailContent(_ issue: PrintIssue) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: AppleSpacing.xxl) {
                 // Hero Section
-                HStack(alignment: .top, spacing: 24) {
-                    // Image card
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(cardGradient(for: issue))
-                            .frame(width: 140, height: 140)
+                heroSection(issue)
 
-                        if let imageUrl = issue.imageUrl, let url = URL(string: imageUrl) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .empty:
-                                    ProgressView()
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                case .failure:
-                                    Image(systemName: issueIcon(for: issue))
-                                        .font(.system(size: 48))
-                                        .foregroundStyle(.white.opacity(0.9))
-                                @unknown default:
-                                    Image(systemName: issueIcon(for: issue))
-                                        .font(.system(size: 48))
-                                        .foregroundStyle(.white.opacity(0.9))
-                                }
-                            }
-                            .frame(width: 140, height: 140)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                        } else {
-                            Image(systemName: issueIcon(for: issue))
-                                .font(.system(size: 48))
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
-                    }
-                    .frame(width: 140, height: 140)
-
-                    // Basic Info
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(issue.name)
-                            .font(.largeTitle.bold())
-
-                        // Badges
-                        HStack(spacing: 8) {
-                            Badge(
-                                text: issue.printerType.uppercased(),
-                                color: issue.printerType == "fdm" ? .blue : .purple
-                            )
-
-                            Badge(
-                                text: issue.difficultyLevel.capitalized,
-                                color: difficultyColor(for: issue.difficultyLevel)
-                            )
-
-                            if let category = issue.category {
-                                Badge(
-                                    text: category.capitalized,
-                                    color: .gray
-                                )
-                            }
-                        }
-
-                        Text(issue.description)
-                            .font(.body)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 4)
-                    }
-                }
-
-                Divider()
+                AppleDivider()
 
                 // Symptoms Section
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text("Symptoms")
-                            .font(.title2.bold())
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(issue.symptoms, id: \.self) { symptom in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: "exclamationmark.circle")
-                                    .foregroundStyle(.orange)
-                                    .font(.callout)
-                                Text(symptom)
-                                    .font(.callout)
-                            }
-                        }
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.orange.opacity(0.05))
-                    .cornerRadius(12)
-                }
+                symptomsSection(issue)
 
                 // Causes Section
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "questionmark.circle.fill")
-                            .foregroundStyle(.red)
-                        Text("Possible Causes")
-                            .font(.title2.bold())
-                    }
+                causesSection(issue)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(issue.causes, id: \.self) { cause in
-                            HStack(alignment: .top, spacing: 12) {
-                                Image(systemName: "arrow.right.circle")
-                                    .foregroundStyle(.red)
-                                    .font(.callout)
-                                Text(cause)
-                                    .font(.callout)
-                            }
-                        }
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.red.opacity(0.05))
-                    .cornerRadius(12)
-                }
-
-                Divider()
+                AppleDivider()
 
                 // Solutions Section
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Image(systemName: "wrench.and.screwdriver.fill")
-                            .foregroundStyle(.green)
-                        Text("Step-by-Step Solutions")
-                            .font(.title2.bold())
-                    }
-
-                    ForEach(issue.solutions) { step in
-                        SolutionStepCard(step: step)
-                    }
-                }
+                solutionsSection(issue)
 
                 // Prevention Tips Section
                 if !issue.preventionTips.isEmpty {
-                    Divider()
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "shield.checkered")
-                                .foregroundStyle(.blue)
-                            Text("Prevention Tips")
-                                .font(.title2.bold())
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(issue.preventionTips, id: \.self) { tip in
-                                HStack(alignment: .top, spacing: 12) {
-                                    Image(systemName: "checkmark.seal.fill")
-                                        .foregroundStyle(.blue)
-                                        .font(.callout)
-                                    Text(tip)
-                                        .font(.callout)
-                                }
-                            }
-                        }
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.blue.opacity(0.05))
-                        .cornerRadius(12)
-                    }
+                    AppleDivider()
+                    preventionSection(issue)
                 }
 
                 // Related Materials Section
                 if !issue.relatedMaterials.isEmpty {
-                    Divider()
+                    AppleDivider()
+                    relatedMaterialsSection(issue)
+                }
+            }
+            .padding(AppleSpacing.xxl)
+        }
+    }
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "cylinder.fill")
-                                .foregroundStyle(.purple)
-                            Text("Related Materials")
-                                .font(.title2.bold())
-                        }
+    // MARK: - Hero Section
 
-                        FlowLayout(spacing: 8) {
-                            ForEach(issue.relatedMaterials, id: \.self) { material in
-                                Text(material)
-                                    .font(.callout)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(.purple.opacity(0.1))
-                                    .cornerRadius(8)
-                            }
+    private func heroSection(_ issue: PrintIssue) -> some View {
+        HStack(alignment: .top, spacing: AppleSpacing.xxl) {
+            // Image card
+            ZStack {
+                cardGradient(for: issue)
+                    .frame(width: 120, height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: AppleRadius.xl))
+
+                if let imageUrl = issue.imageUrl, let url = URL(string: imageUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView().scaleEffect(0.6)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        case .failure:
+                            Image(systemName: issueIcon(for: issue))
+                                .font(.system(size: 40, weight: .light))
+                                .foregroundStyle(.white.opacity(0.9))
+                        @unknown default:
+                            Image(systemName: issueIcon(for: issue))
+                                .font(.system(size: 40, weight: .light))
+                                .foregroundStyle(.white.opacity(0.9))
                         }
+                    }
+                    .frame(width: 120, height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: AppleRadius.xl))
+                } else {
+                    Image(systemName: issueIcon(for: issue))
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundStyle(.white.opacity(0.9))
+                }
+            }
+            .frame(width: 120, height: 120)
+
+            // Basic Info
+            VStack(alignment: .leading, spacing: AppleSpacing.md) {
+                Text(issue.name)
+                    .font(AppleTypography.largeTitle)
+
+                // Badges
+                HStack(spacing: AppleSpacing.sm) {
+                    ApplePill(
+                        text: issue.printerType.uppercased(),
+                        color: issue.printerType == "fdm" ? .appleBlue : .applePurple
+                    )
+
+                    ApplePill(
+                        text: issue.difficultyLevel.capitalized,
+                        color: difficultyColor(for: issue.difficultyLevel)
+                    )
+
+                    if let category = issue.category {
+                        ApplePill(text: category.capitalized, color: .appleGray1)
+                    }
+                }
+
+                Text(issue.description)
+                    .font(AppleTypography.body)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, AppleSpacing.xs)
+            }
+        }
+    }
+
+    // MARK: - Symptoms Section
+
+    private func symptomsSection(_ issue: PrintIssue) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.lg) {
+            AppleSectionHeader(title: "Symptoms", icon: "exclamationmark.triangle.fill", iconColor: .appleOrange)
+
+            VStack(alignment: .leading, spacing: AppleSpacing.sm) {
+                ForEach(issue.symptoms, id: \.self) { symptom in
+                    HStack(alignment: .top, spacing: AppleSpacing.md) {
+                        Image(systemName: "exclamationmark.circle")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.appleOrange)
+                        Text(symptom)
+                            .font(AppleTypography.callout)
                     }
                 }
             }
-            .padding(24)
+            .padding(AppleSpacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.appleOrange.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: AppleRadius.lg))
+        }
+    }
+
+    // MARK: - Causes Section
+
+    private func causesSection(_ issue: PrintIssue) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.lg) {
+            AppleSectionHeader(title: "Possible Causes", icon: "questionmark.circle.fill", iconColor: .appleRed)
+
+            VStack(alignment: .leading, spacing: AppleSpacing.sm) {
+                ForEach(issue.causes, id: \.self) { cause in
+                    HStack(alignment: .top, spacing: AppleSpacing.md) {
+                        Image(systemName: "arrow.right.circle")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.appleRed)
+                        Text(cause)
+                            .font(AppleTypography.callout)
+                    }
+                }
+            }
+            .padding(AppleSpacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.appleRed.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: AppleRadius.lg))
+        }
+    }
+
+    // MARK: - Solutions Section
+
+    private func solutionsSection(_ issue: PrintIssue) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.lg) {
+            AppleSectionHeader(title: "Step-by-Step Solutions", icon: "wrench.and.screwdriver.fill", iconColor: .appleGreen)
+
+            VStack(spacing: AppleSpacing.md) {
+                ForEach(issue.solutions) { step in
+                    AppleSolutionStepCard(step: step)
+                }
+            }
+        }
+    }
+
+    // MARK: - Prevention Section
+
+    private func preventionSection(_ issue: PrintIssue) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.lg) {
+            AppleSectionHeader(title: "Prevention Tips", icon: "shield.checkered", iconColor: .appleBlue)
+
+            VStack(alignment: .leading, spacing: AppleSpacing.sm) {
+                ForEach(issue.preventionTips, id: \.self) { tip in
+                    HStack(alignment: .top, spacing: AppleSpacing.md) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.appleBlue)
+                        Text(tip)
+                            .font(AppleTypography.callout)
+                    }
+                }
+            }
+            .padding(AppleSpacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.appleBlue.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: AppleRadius.lg))
+        }
+    }
+
+    // MARK: - Related Materials Section
+
+    private func relatedMaterialsSection(_ issue: PrintIssue) -> some View {
+        VStack(alignment: .leading, spacing: AppleSpacing.lg) {
+            AppleSectionHeader(title: "Related Materials", icon: "cylinder.fill", iconColor: .applePurple)
+
+            AppleFlowLayout(spacing: AppleSpacing.sm) {
+                ForEach(issue.relatedMaterials, id: \.self) { material in
+                    AppleTag(text: material, color: .applePurple)
+                }
+            }
         }
     }
 
@@ -264,44 +261,28 @@ struct TroubleshootingDetailView: View {
         switch issue.printerType {
         case "fdm":
             switch issue.category?.lowercased() {
-            case "extrusion": colors = [.orange, .red]
-            case "adhesion": colors = [.blue, .cyan]
-            case "quality": colors = [.purple, .pink]
-            case "mechanical": colors = [.gray, .blue]
-            case "structural": colors = [.green, .teal]
-            default: colors = [.blue, .indigo]
+            case "extrusion": colors = [.appleOrange, .appleRed]
+            case "adhesion": colors = [.appleBlue, .appleCyan]
+            case "quality": colors = [.applePurple, .applePink]
+            case "mechanical": colors = [.appleGray1, .appleBlue]
+            case "structural": colors = [.appleGreen, .appleTeal]
+            default: colors = [.appleBlue, .appleIndigo]
             }
         case "resin":
-            colors = [.purple, .indigo]
+            colors = [.applePurple, .appleIndigo]
         default:
-            colors = [.gray, .gray.opacity(0.7)]
+            colors = [.appleGray1, .appleGray2]
         }
         return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     private func difficultyColor(for level: String) -> Color {
         switch level {
-        case "beginner": return .green
-        case "intermediate": return .orange
-        case "advanced": return .red
-        default: return .gray
+        case "beginner": return .appleGreen
+        case "intermediate": return .appleOrange
+        case "advanced": return .appleRed
+        default: return .appleGray1
         }
-    }
-
-    private func errorView(_ error: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-                .foregroundStyle(.orange)
-            Text(error)
-                .foregroundStyle(.secondary)
-            Button("Retry") {
-                Task {
-                    await loadIssue()
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Actions
@@ -320,50 +301,59 @@ struct TroubleshootingDetailView: View {
     }
 }
 
-// MARK: - Solution Step Card
+// MARK: - Apple Solution Step Card
+
+struct AppleSolutionStepCard: View {
+    let step: SolutionStep
+
+    var body: some View {
+        HStack(alignment: .top, spacing: AppleSpacing.lg) {
+            // Step number
+            Text("\(step.step)")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Color.appleGreen)
+                .clipShape(Circle())
+
+            // Content
+            VStack(alignment: .leading, spacing: AppleSpacing.sm) {
+                Text(step.title)
+                    .font(AppleTypography.headline)
+
+                Text(step.description)
+                    .font(AppleTypography.callout)
+                    .foregroundStyle(.secondary)
+
+                if let tip = step.tip {
+                    HStack(alignment: .top, spacing: AppleSpacing.sm) {
+                        Image(systemName: "lightbulb.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.appleYellow)
+                        Text(tip)
+                            .font(AppleTypography.callout)
+                            .italic()
+                    }
+                    .padding(AppleSpacing.md)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.appleYellow.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: AppleRadius.sm))
+                }
+            }
+        }
+        .padding(AppleSpacing.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: AppleRadius.lg))
+    }
+}
+
+// MARK: - Legacy Components
 
 struct SolutionStepCard: View {
     let step: SolutionStep
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            // Step number
-            ZStack {
-                Circle()
-                    .fill(.green)
-                    .frame(width: 36, height: 36)
-                Text("\(step.step)")
-                    .font(.headline.bold())
-                    .foregroundStyle(.white)
-            }
-
-            // Content
-            VStack(alignment: .leading, spacing: 8) {
-                Text(step.title)
-                    .font(.headline)
-
-                Text(step.description)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                if let tip = step.tip {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "lightbulb.fill")
-                            .foregroundStyle(.yellow)
-                        Text(tip)
-                            .font(.callout)
-                            .italic()
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.yellow.opacity(0.1))
-                    .cornerRadius(8)
-                }
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.secondary.opacity(0.05))
-        .cornerRadius(12)
+        AppleSolutionStepCard(step: step)
     }
 }

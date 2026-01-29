@@ -21,41 +21,20 @@ struct PrinterBrowseView: View {
 
     var body: some View {
         HSplitView {
-            // Filter Sidebar
+            // Apple-style Filter Sidebar
             filterSidebar
-                .frame(minWidth: 200, maxWidth: 250)
+                .frame(minWidth: 220, maxWidth: 260)
 
             // Main Content
-            VStack(spacing: 0) {
-                if let error = errorMessage {
-                    errorView(error)
-                } else if isLoading {
-                    ProgressView("Loading printers...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if printers.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "printer")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text("No printers found")
-                            .foregroundStyle(.secondary)
-                        Text("Try adjusting your filters")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    printerList
-                }
-            }
-            .frame(minWidth: 400)
+            mainContent
+                .frame(minWidth: 500)
         }
         .task {
             await loadPrinters()
         }
         .sheet(item: $detailPrinterId) { printerId in
             PrinterDetailView(printerId: printerId)
-                .frame(minWidth: 600, minHeight: 500)
+                .frame(minWidth: 700, minHeight: 550)
         }
     }
 
@@ -63,39 +42,38 @@ struct PrinterBrowseView: View {
 
     private var filterSidebar: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: AppleSpacing.xl) {
+                // Header
                 Text("Filters")
-                    .font(.headline)
+                    .font(AppleTypography.title3)
+                    .padding(.bottom, AppleSpacing.xs)
 
                 // Price Range
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Price Range")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                AppleSidebarSection("Price Range") {
+                    VStack(spacing: AppleSpacing.md) {
+                        HStack {
+                            Text("$\(Int(priceMin))")
+                                .font(AppleTypography.mono)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("$\(Int(priceMax))")
+                                .font(AppleTypography.mono)
+                                .foregroundStyle(.secondary)
+                        }
 
-                    HStack {
-                        Text("$\(Int(priceMin))")
-                            .monospacedDigit()
-                        Spacer()
-                        Text("$\(Int(priceMax))")
-                            .monospacedDigit()
-                    }
-                    .font(.caption)
-
-                    HStack {
-                        Slider(value: $priceMin, in: 0...5000, step: 50)
-                        Slider(value: $priceMax, in: 100...6000, step: 50)
+                        VStack(spacing: AppleSpacing.sm) {
+                            Slider(value: $priceMin, in: 0...5000, step: 50)
+                                .tint(Color.appleBlue)
+                            Slider(value: $priceMax, in: 100...6000, step: 50)
+                                .tint(Color.appleBlue)
+                        }
                     }
                 }
 
-                Divider()
+                AppleDivider()
 
                 // Printer Type
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Printer Type")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
+                AppleSidebarSection("Printer Type") {
                     Picker("Type", selection: $selectedType) {
                         Text("All Types").tag(nil as PrinterType?)
                         ForEach(PrinterType.allCases) { type in
@@ -106,14 +84,8 @@ struct PrinterBrowseView: View {
                     .pickerStyle(.menu)
                 }
 
-                Divider()
-
-                // Motion System (FDM only)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Motion System")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
+                // Motion System
+                AppleSidebarSection("Motion System") {
                     Picker("Motion", selection: $selectedMotionSystem) {
                         Text("All Systems").tag(nil as MotionSystem?)
                         ForEach(MotionSystem.allCases) { system in
@@ -124,14 +96,8 @@ struct PrinterBrowseView: View {
                     .pickerStyle(.menu)
                 }
 
-                Divider()
-
                 // Skill Level
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Skill Level")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
+                AppleSidebarSection("Skill Level") {
                     Picker("Skill", selection: $selectedSkillLevel) {
                         Text("All Levels").tag(nil as SkillLevel?)
                         ForEach(SkillLevel.allCases) { level in
@@ -142,14 +108,8 @@ struct PrinterBrowseView: View {
                     .pickerStyle(.menu)
                 }
 
-                Divider()
-
                 // Use Case
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Use Case")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
+                AppleSidebarSection("Use Case") {
                     Picker("Use Case", selection: $selectedUseCase) {
                         Text("All Use Cases").tag(nil as UseCase?)
                         ForEach(UseCase.allCases) { useCase in
@@ -160,69 +120,85 @@ struct PrinterBrowseView: View {
                     .pickerStyle(.menu)
                 }
 
-                Divider()
+                AppleDivider()
 
-                // Enclosure Toggle
-                Toggle("Enclosed Only", isOn: $filterEnclosure)
-
-                // Multi Color Toggle
-                Toggle("Multi Color Support", isOn: $filterMultiColor)
-
-                Spacer()
-
-                // Apply Button
-                Button("Apply Filters") {
-                    Task {
-                        await loadPrinters()
+                // Feature Toggles
+                VStack(alignment: .leading, spacing: AppleSpacing.md) {
+                    Toggle(isOn: $filterEnclosure) {
+                        Label("Enclosed Only", systemImage: "cube.box")
+                            .font(AppleTypography.callout)
                     }
-                }
-                .buttonStyle(.borderedProminent)
+                    .toggleStyle(.switch)
+                    .tint(Color.appleBlue)
 
-                Button("Reset Filters") {
-                    resetFilters()
-                    Task {
-                        await loadPrinters()
+                    Toggle(isOn: $filterMultiColor) {
+                        Label("Multi-Color", systemImage: "paintpalette")
+                            .font(AppleTypography.callout)
                     }
+                    .toggleStyle(.switch)
+                    .tint(Color.appleBlue)
                 }
-                .buttonStyle(.bordered)
+
+                Spacer(minLength: AppleSpacing.xl)
+
+                // Action Buttons
+                VStack(spacing: AppleSpacing.sm) {
+                    ApplePrimaryButton(title: "Apply Filters", icon: "line.3.horizontal.decrease") {
+                        Task { await loadPrinters() }
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    AppleSecondaryButton(title: "Reset", icon: "arrow.counterclockwise") {
+                        resetFilters()
+                        Task { await loadPrinters() }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
-            .padding()
+            .padding(AppleSpacing.lg)
         }
-        .background(.bar)
+        .appleSidebar()
     }
 
-    // MARK: - Printer List (Grid with images)
+    // MARK: - Main Content
 
-    private var printerList: some View {
+    private var mainContent: some View {
+        Group {
+            if let error = errorMessage {
+                AppleErrorState(message: error) {
+                    Task { await loadPrinters() }
+                }
+            } else if isLoading {
+                AppleLoadingState(message: "Loading printers...")
+            } else if printers.isEmpty {
+                AppleEmptyState(
+                    icon: "printer",
+                    title: "No printers found",
+                    subtitle: "Try adjusting your filters"
+                )
+            } else {
+                printerGrid
+            }
+        }
+    }
+
+    // MARK: - Printer Grid
+
+    private var printerGrid: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280, maximum: 350))], spacing: 16) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 260, maximum: 320))],
+                spacing: AppleSpacing.lg
+            ) {
                 ForEach(printers) { printer in
-                    PrinterCard(printer: printer)
+                    ApplePrinterCard(printer: printer)
                         .onTapGesture {
                             detailPrinterId = printer.id
                         }
                 }
             }
-            .padding()
+            .padding(AppleSpacing.xl)
         }
-    }
-
-    // MARK: - Error View
-
-    private func errorView(_ error: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-                .foregroundStyle(.orange)
-            Text(error)
-                .foregroundStyle(.secondary)
-            Button("Retry") {
-                Task {
-                    await loadPrinters()
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Actions
@@ -263,87 +239,57 @@ struct PrinterBrowseView: View {
     }
 }
 
-// MARK: - Printer Card
+// MARK: - Apple-Style Printer Card
 
-struct PrinterCard: View {
+struct ApplePrinterCard: View {
     let printer: PrinterListItem
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Image
-            AsyncImage(url: URL(string: printer.imageUrl ?? "")) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(.secondary.opacity(0.1))
-                        .overlay {
-                            ProgressView()
-                        }
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                case .failure:
-                    Rectangle()
-                        .fill(.secondary.opacity(0.1))
-                        .overlay {
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundStyle(.secondary)
-                        }
-                @unknown default:
-                    EmptyView()
-                }
-            }
-            .frame(height: 160)
-            .frame(maxWidth: .infinity)
-            .background(.secondary.opacity(0.05))
-            .clipped()
+            AppleAsyncImage(url: printer.imageUrl, fallbackIcon: "printer")
+                .frame(height: 150)
+                .frame(maxWidth: .infinity)
+                .background(Color.primary.opacity(0.02))
+                .clipped()
 
-            // Info
-            VStack(alignment: .leading, spacing: 8) {
-                // Name and Price
+            // Content
+            VStack(alignment: .leading, spacing: AppleSpacing.sm) {
+                // Header: Name + Price
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(printer.name)
-                            .font(.headline)
+                            .font(AppleTypography.headline)
                             .lineLimit(1)
+
                         Text(printer.manufacturer)
-                            .font(.caption)
+                            .font(AppleTypography.caption)
                             .foregroundStyle(.secondary)
                     }
+
                     Spacer()
-                    Text("$\(printer.price, specifier: "%.0f")")
-                        .font(.title3.bold())
-                        .foregroundStyle(.green)
+
+                    ApplePrice(amount: printer.price, size: .medium)
                 }
 
                 // Badges
-                HStack(spacing: 6) {
-                    // Type badge
-                    Text(printer.printerType.uppercased())
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(printer.printerType == "fdm" ? .blue.opacity(0.2) : .purple.opacity(0.2))
-                        .cornerRadius(4)
+                HStack(spacing: AppleSpacing.sm) {
+                    ApplePill(
+                        text: printer.printerType.uppercased(),
+                        color: printer.printerType == "fdm" ? .appleBlue : .applePurple
+                    )
 
-                    // Motion badge (FDM only)
                     if let motion = printer.motionSystem {
-                        Text(motion == "corexy" ? "CoreXY" : "Bed Slinger")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(motion == "corexy" ? .green.opacity(0.2) : .orange.opacity(0.2))
-                            .cornerRadius(4)
+                        ApplePill(
+                            text: motion == "corexy" ? "CoreXY" : "Bed Slinger",
+                            color: motion == "corexy" ? .appleGreen : .appleOrange
+                        )
                     }
 
                     Spacer()
 
                     // Feature icons
-                    HStack(spacing: 4) {
+                    HStack(spacing: AppleSpacing.xs) {
                         if printer.enclosure {
                             Image(systemName: "cube.box.fill")
                                 .help("Enclosed")
@@ -353,24 +299,24 @@ struct PrinterCard: View {
                                 .help("Auto Leveling")
                         }
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
                 }
 
                 // Build Volume
-                HStack {
+                HStack(spacing: AppleSpacing.xs) {
                     Image(systemName: "cube")
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10))
                     Text(printer.buildVolumeDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(AppleTypography.caption)
                 }
+                .foregroundStyle(.secondary)
             }
-            .padding(12)
+            .padding(AppleSpacing.md)
         }
-        .background(.background)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: AppleRadius.card))
+        .appleShadow(AppleShadow.card)
         .contentShape(Rectangle())
     }
 }
